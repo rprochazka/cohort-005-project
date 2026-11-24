@@ -37,7 +37,7 @@ export function LessonNote({ note }: { note: LessonNoteData }) {
             note={note}
             draft={draft}
             isSaving={isSaving}
-            error={fetcher.data?.error}
+            error={fetcher.data?.error ?? draft.error ?? undefined}
           />
         </fetcher.Form>
       </CardContent>

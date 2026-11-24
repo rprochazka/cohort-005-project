@@ -1,4 +1,8 @@
-import { describeDraft as describe, type NoteDraft } from "./lib/draft";
+import {
+  describeDraft,
+  noteBodySchema as bodySchema,
+  type NoteDraft,
+} from "./lib/draft";
 
 export type { NoteDraft };
 
@@ -7,6 +11,9 @@ export type { NoteDraft };
  * count, whether it is over the limit, and whether Save should be enabled.
  * `savedBody` is the note as last saved ("" when there is none).
  */
-export function describeNoteDraft(draft: string, savedBody: string): NoteDraft {
-  return describe(draft, savedBody);
+export function describeNoteDraft(text: string, savedBody: string): NoteDraft {
+  return describeDraft(text, savedBody);
 }
+
+/** The rules a lesson note's body must pass before it is saved. */
+export const noteBodySchema = bodySchema;

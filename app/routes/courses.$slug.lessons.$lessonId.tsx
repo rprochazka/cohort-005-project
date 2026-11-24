@@ -16,8 +16,7 @@ import { isBookmarked, toggleBookmark } from "~/lib/bookmarks.server";
 import { getNote, saveNote } from "~/lib/notes.server";
 import { CommentThread } from "~/components/comment-thread";
 import { db } from "~/db";
-import { quizzes, LessonProgressStatus } from "~/db/schema";
-import { eq } from "drizzle-orm";
+import { LessonProgressStatus } from "~/db/schema";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { LessonNote } from "~/components/lesson-note";
@@ -26,7 +25,7 @@ import { formatDuration } from "~/lib/utils";
 import { renderMarkdown } from "~/lib/markdown.server";
 import { YouTubePlayer } from "~/components/youtube-player";
 import { data } from "react-router";
-import { parseFormData } from "~/lib/validation";
+import { parseFormData, parseParams } from "~/lib/validation";
 import {
   getCourseWithDetails,
   getLessonById,
@@ -48,6 +47,7 @@ import {
   renderThread,
 } from "~/modules/lesson-viewer/thread.server";
 import {
+  getQuizById,
   getQuizByLessonId,
   getQuizWithQuestions,
   getBestAttempt,
@@ -58,6 +58,9 @@ import {
   editCommentSchema,
   saveNoteSchema,
   deleteCommentSchema,
+  lessonParamsSchema,
+  submitQuizSchema,
+  quizAnswerSchema,
   INTENT_CAPABILITY,
 } from "~/modules/lesson-viewer/schemas";
 import { CurriculumSidebar } from "~/components/lesson/curriculum-sidebar";
@@ -99,7 +102,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   const { course, person, enrolled, view, take, manage } = decisions;
   const currentUserId = person?.id ?? null;
-  const lessonId = Number(params.lessonId);
+  const { lessonId } = parseParams(params, lessonParamsSchema);
 
   const courseWithDetails = getCourseWithDetails(course.id);
   const lesson = getLessonById(lessonId);
@@ -294,7 +297,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     ref
   );
   const currentUserId = person.id;
-  const lessonId = Number(params.lessonId);
+  const { lessonId } = parseParams(params, lessonParamsSchema);
 
   if (
     intent === "create-comment" ||
@@ -406,26 +409,29 @@ export async function action({ params, request }: Route.ActionArgs) {
   }
 
   if (intent === "submit-quiz") {
-    const quizId = Number(formData.get("quizId"));
-    if (isNaN(quizId)) {
+    const parsedQuiz = submitQuizSchema.safeParse({
+      quizId: formData.get("quizId"),
+    });
+    if (!parsedQuiz.success) {
       throw data("Invalid quiz ID", { status: 400 });
     }
+    const { quizId } = parsedQuiz.data;
     // Scope the quiz to this lesson so a quiz elsewhere can't be reached by
     // posting its id to this route.
-    const quiz = db.select().from(quizzes).where(eq(quizzes.id, quizId)).get();
+    const quiz = getQuizById(quizId);
     if (!quiz || quiz.lessonId !== lessonId) {
       throw data("Quiz not found", { status: 404 });
     }
 
-    // Collect answers: form fields named "question-{questionId}" with value = optionId
     const selectedAnswers: Record<number, number> = {};
     for (const [key, value] of formData.entries()) {
-      if (key.startsWith("question-")) {
-        const questionId = Number(key.replace("question-", ""));
-        const optionId = Number(value);
-        if (!isNaN(questionId) && !isNaN(optionId)) {
-          selectedAnswers[questionId] = optionId;
-        }
+      if (!key.startsWith("question-")) continue;
+      const answer = quizAnswerSchema.safeParse({
+        questionId: key.slice("question-".length),
+        optionId: value,
+      });
+      if (answer.success) {
+        selectedAnswers[answer.data.questionId] = answer.data.optionId;
       }
     }
 

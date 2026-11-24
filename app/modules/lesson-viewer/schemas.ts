@@ -2,6 +2,10 @@ import { z } from "zod";
 import { MAX_NOTE_LENGTH } from "~/lib/notes";
 import type { Capability } from "~/modules/permissions/course-permissions.server";
 
+export const lessonParamsSchema = z.object({
+  lessonId: z.coerce.number().int().positive(),
+});
+
 export const createCommentSchema = z.object({
   intent: z.literal("create-comment"),
   body: z.string(),
@@ -23,6 +27,16 @@ export const saveNoteSchema = z.object({
       MAX_NOTE_LENGTH,
       `Your note is over ${MAX_NOTE_LENGTH.toLocaleString("en")} characters, so it was not saved.`
     ),
+});
+
+export const submitQuizSchema = z.object({
+  quizId: z.coerce.number().int().positive(),
+});
+
+// One "question-{questionId}" field whose value is the chosen option id.
+export const quizAnswerSchema = z.object({
+  questionId: z.coerce.number().int().positive(),
+  optionId: z.coerce.number().int().positive(),
 });
 
 export const deleteCommentSchema = z.object({

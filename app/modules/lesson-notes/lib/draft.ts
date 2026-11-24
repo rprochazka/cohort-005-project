@@ -27,15 +27,17 @@ export type NoteDraft = {
 export function describeDraft(text: string, savedBody: string): NoteDraft {
   const trimmed = text.trim();
   const unchanged = trimmed === savedBody;
-  const tooLong = trimmed.length > MAX_NOTE_LENGTH;
   const result = noteBodySchema.safeParse(text);
+  const tooLongIssue = result.error?.issues.find(
+    (issue) => issue.code === "too_big"
+  );
   return {
     length: trimmed.length,
     max: MAX_NOTE_LENGTH,
-    tooLong,
+    tooLong: tooLongIssue !== undefined,
     empty: trimmed.length === 0,
     unchanged,
     canSave: !unchanged && result.success,
-    error: tooLong ? (result.error?.issues[0]?.message ?? null) : null,
+    error: tooLongIssue?.message ?? null,
   };
 }

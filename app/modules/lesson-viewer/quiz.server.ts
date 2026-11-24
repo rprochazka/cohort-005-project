@@ -6,7 +6,7 @@ import {
   quizAttempts,
   quizAnswers,
 } from "~/db/schema";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 export function getQuizByLessonId(lessonId: number) {
   return db.select().from(quizzes).where(eq(quizzes.lessonId, lessonId)).get();
@@ -27,14 +27,23 @@ export function getQuizWithQuestions(quizId: number) {
     .orderBy(quizQuestions.position)
     .all();
 
-  const questionsWithOptions = questions.map((question) => {
-    const options = db
-      .select()
-      .from(quizOptions)
-      .where(eq(quizOptions.questionId, question.id))
-      .all();
-    return { ...question, options };
-  });
+  const options = questions.length
+    ? db
+        .select()
+        .from(quizOptions)
+        .where(
+          inArray(
+            quizOptions.questionId,
+            questions.map((question) => question.id)
+          )
+        )
+        .orderBy(quizOptions.id)
+        .all()
+    : [];
+  const questionsWithOptions = questions.map((question) => ({
+    ...question,
+    options: options.filter((option) => option.questionId === question.id),
+  }));
 
   return { ...quiz, questions: questionsWithOptions };
 }
